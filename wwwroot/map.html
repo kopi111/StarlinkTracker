@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JCF Starlink Tracker - Jamaica</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        #header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        #header p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        #controls {
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        #controls select, #controls button {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        #controls button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            transition: background 0.3s;
+        }
+
+        #controls button:hover {
+            background: #c82333;
+        }
+
+        #stats {
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+        }
+
+        .stat-box h3 {
+            font-size: 32px;
+            color: #dc3545;
+            margin-bottom: 5px;
+        }
+
+        .stat-box p {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .stat-box.active {
+            border-left-color: #28a745;
+        }
+
+        .stat-box.active h3 {
+            color: #28a745;
+        }
+
+        .stat-box.offline {
+            border-left-color: #dc3545;
+        }
+
+        .stat-box.offline h3 {
+            color: #dc3545;
+        }
+
+        .stat-box.maintenance {
+            border-left-color: #ffc107;
+        }
+
+        .stat-box.maintenance h3 {
+            color: #ffc107;
+        }
+
+        #map {
+            height: calc(100vh - 280px);
+            min-height: 400px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 3% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .close {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .close:hover {
+            transform: scale(1.2);
+        }
+
+        .modal-body {
+            padding: 30px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #dc3545;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .required {
+            color: #dc3545;
+        }
+
+        .device-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .device-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .device-item:hover {
+            background: #f8f9fa;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .device-info h4 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .device-info p {
+            margin: 0;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .device-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .alert {
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .leaflet-popup-content {
+            margin: 15px;
+            min-width: 250px;
+        }
+
+        .popup-header {
+            font-size: 16px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dc3545;
+        }
+
+        .popup-row {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .popup-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .popup-value {
+            color: #333;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .status-active {
+            background: #28a745;
+        }
+
+        .status-offline {
+            background: #dc3545;
+        }
+
+        .status-maintenance {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+        }
+
+        .legend h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .legend-item {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1><i class="fas fa-satellite-dish"></i> JCF Starlink Device Tracker - Jamaica</h1>
+        <p>Real-time monitoring of Starlink deployments across Jamaica with focus on police stations</p>
+        <p style="font-size: 12px; opacity: 0.8; margin-top: 5px;"><i class="fas fa-info-circle"></i> Tip: Double-click anywhere on the map to add a device at that location</p>
+    </div>
+
+    <div id="stats">
+        <div class="stat-box">
+            <h3 id="totalDevices">0</h3>
+            <p>Total Devices</p>
+        </div>
+        <div class="stat-box active">
+            <h3 id="activeDevices">0</h3>
+            <p>Active</p>
+        </div>
+        <div class="stat-box offline">
+            <h3 id="offlineDevices">0</h3>
+            <p>Offline</p>
+        </div>
+        <div class="stat-box maintenance">
+            <h3 id="maintenanceDevices">0</h3>
+            <p>Maintenance</p>
+        </div>
+        <div class="stat-box">
+            <h3 id="policeStations">0</h3>
+            <p>Police Stations</p>
+        </div>
+    </div>
+
+    <div id="controls">
+        <label>
+            <strong>Filter by Parish:</strong>
+            <select id="parishFilter">
+                <option value="">All Parishes</option>
+            </select>
+        </label>
+        <label>
+            <strong>Filter by Type:</strong>
+            <select id="typeFilter">
+                <option value="">All Types</option>
+                <option value="PoliceStation">Police Stations</option>
+                <option value="School">Schools</option>
+                <option value="Hospital">Hospitals</option>
+                <option value="Government">Government</option>
+                <option value="Business">Business</option>
+                <option value="Community">Community</option>
+                <option value="Other">Other</option>
+            </select>
+        </label>
+        <label>
+            <strong>Filter by Status:</strong>
+            <select id="statusFilter">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Offline">Offline</option>
+                <option value="MaintenanceNeeded">Maintenance Needed</option>
+            </select>
+        </label>
+        <button onclick="openAddDeviceModal()"><i class="fas fa-plus-circle"></i> Add Device</button>
+        <button onclick="openManageDevicesModal()"><i class="fas fa-list"></i> Manage Devices</button>
+        <button onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Export to Excel</button>
+        <button onclick="exportToGeoJson()"><i class="fas fa-map"></i> Export GeoJSON</button>
+        <button onclick="window.location.href='/swagger'"><i class="fas fa-code"></i> API Docs</button>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Add Device Modal -->
+    <div id="addDeviceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> Add New Starlink Device</h2>
+                <span class="close" onclick="closeAddDeviceModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="addAlert" class="alert"></div>
+                <form id="addDeviceForm">
+                    <div class="form-group">
+                        <label>Device ID <span class="required">*</span></label>
+                        <input type="text" id="add_deviceId" required placeholder="e.g., SL-OCH-001">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Serial Number</label>
+                            <input type="text" id="add_serialNumber" placeholder="e.g., STARLINK-008">
+                        </div>
+                        <div class="form-group">
+                            <label>Installation Date <span class="required">*</span></label>
+                            <input type="date" id="add_installationDate" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Location Name <span class="required">*</span></label>
+                        <input type="text" id="add_locationName" required placeholder="e.g., Ocho Rios Police Station">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Physical Address <span class="required">*</span></label>
+                        <input type="text" id="add_physicalAddress" required placeholder="e.g., Main Street, Ocho Rios">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Parish <span class="required">*</span></label>
+                            <select id="add_parish" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Location Type <span class="required">*</span></label>
+                            <select id="add_locationType" required>
+                                <option value="PoliceStation">Police Station</option>
+                                <option value="School">School</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="Government">Government</option>
+                                <option value="Business">Business</option>
+                                <option value="Community">Community</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Latitude <span class="required">*</span></label>
+                            <input type="number" step="any" id="add_latitude" required placeholder="e.g., 18.4078">
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude <span class="required">*</span></label>
+                            <input type="number" step="any" id="add_longitude" required placeholder="e.g., -77.1032">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="add_status" required>
+                            <option value="Active">Active</option>
+                            <option value="MaintenanceNeeded">Maintenance Needed</option>
+                            <option value="Offline">Offline</option>
+                            <option value="Decommissioned">Decommissioned</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Person</label>
+                            <input type="text" id="add_contactPerson" placeholder="e.g., Superintendent Smith">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Phone</label>
+                            <input type="text" id="add_contactPhone" placeholder="e.g., (876) 974-1234">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="add_notes" placeholder="Additional information about this device..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeAddDeviceModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddDevice()"><i class="fas fa-save"></i> Add Device</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Device Modal -->
+    <div id="editDeviceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Edit Starlink Device</h2>
+                <span class="close" onclick="closeEditDeviceModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="editAlert" class="alert"></div>
+                <form id="editDeviceForm">
+                    <input type="hidden" id="edit_id">
+
+                    <div class="form-group">
+                        <label>Device ID <span class="required">*</span></label>
+                        <input type="text" id="edit_deviceId" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Serial Number</label>
+                            <input type="text" id="edit_serialNumber">
+                        </div>
+                        <div class="form-group">
+                            <label>Installation Date <span class="required">*</span></label>
+                            <input type="date" id="edit_installationDate" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Location Name <span class="required">*</span></label>
+                        <input type="text" id="edit_locationName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Physical Address <span class="required">*</span></label>
+                        <input type="text" id="edit_physicalAddress" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Parish <span class="required">*</span></label>
+                            <select id="edit_parish" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Location Type <span class="required">*</span></label>
+                            <select id="edit_locationType" required>
+                                <option value="PoliceStation">Police Station</option>
+                                <option value="School">School</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="Government">Government</option>
+                                <option value="Business">Business</option>
+                                <option value="Community">Community</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Latitude <span class="required">*</span></label>
+                            <input type="number" step="any" id="edit_latitude" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Longitude <span class="required">*</span></label>
+                            <input type="number" step="any" id="edit_longitude" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="edit_status" required>
+                            <option value="Active">Active</option>
+                            <option value="MaintenanceNeeded">Maintenance Needed</option>
+                            <option value="Offline">Offline</option>
+                            <option value="Decommissioned">Decommissioned</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Person</label>
+                            <input type="text" id="edit_contactPerson">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Phone</label>
+                            <input type="text" id="edit_contactPhone">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea id="edit_notes"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeEditDeviceModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditDevice()"><i class="fas fa-save"></i> Update Device</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Devices Modal -->
+    <div id="manageDevicesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-list"></i> Manage Starlink Devices</h2>
+                <span class="close" onclick="closeManageDevicesModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="manageAlert" class="alert"></div>
+                <div class="device-list" id="deviceList">
+                    <p style="text-align: center; color: #666;">Loading devices...</p>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeManageDevicesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <script>
+        // Define Jamaica bounds
+        const jamaicaBounds = [
+            [17.7, -78.4],  // Southwest
+            [18.6, -76.2]   // Northeast
+        ];
+
+        // Initialize map centered on Jamaica with bounds
+        const map = L.map('map', {
+            center: [18.1096, -77.2975],
+            zoom: 9,
+            minZoom: 9,
+            maxZoom: 18,
+            maxBounds: [
+                [17.0, -79.0],  // Extended southwest for padding
+                [19.2, -75.5]   // Extended northeast for padding
+            ],
+            maxBoundsViscosity: 0.8
+        });
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Fit to Jamaica on load
+        map.fitBounds(jamaicaBounds);
+
+        // Create marker cluster group with red theme
+        const markers = L.markerClusterGroup({
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                return L.divIcon({
+                    html: '<div style="background-color: #dc3545; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">' + count + '</div>',
+                    className: 'custom-cluster-icon',
+                    iconSize: L.point(40, 40)
+                });
+            }
+        });
+
+        let allDevices = [];
+        let heatLayer = null;
+
+        // Function to get marker color based on status
+        function getMarkerColor(status) {
+            switch(status) {
+                case 'Active': return '#28a745';
+                case 'Offline': return '#dc3545';
+                case 'MaintenanceNeeded': return '#ffc107';
+                default: return '#6c757d';
+            }
+        }
+
+        // Function to create custom marker icon
+        function createMarkerIcon(device) {
+            const color = getMarkerColor(device.status);
+            const icon = device.locationType === 'PoliceStation' ? 'shield-alt' : 'map-marker-alt';
+            const size = device.locationType === 'PoliceStation' ? 30 : 25;
+
+            return L.divIcon({
+                html: `<div style="position: relative;">
+                    <i class="fas fa-${icon}" style="font-size: ${size}px; color: ${color}; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));"></i>
+                </div>`,
+                iconSize: [size, size],
+                className: 'custom-icon'
+            });
+        }
+
+        // Function to create popup content
+        function createPopupContent(device) {
+            const statusClass = device.status === 'Active' ? 'status-active' :
+                              device.status === 'Offline' ? 'status-offline' : 'status-maintenance';
+
+            return `
+                <div class="popup-header">
+                    <i class="fas fa-satellite-dish"></i> ${device.locationName}
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Device ID:</span>
+                    <span class="popup-value">${device.deviceId}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Parish:</span>
+                    <span class="popup-value">${device.parish}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Type:</span>
+                    <span class="popup-value">${device.locationType}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Status:</span>
+                    <span class="status-badge ${statusClass}">${device.status.replace('MaintenanceNeeded', 'Maintenance')}</span>
+                </div>
+                <div class="popup-row">
+                    <span class="popup-label">Address:</span>
+                    <span class="popup-value">${device.physicalAddress}</span>
+                </div>
+                ${device.contactPerson ? `
+                <div class="popup-row">
+                    <span class="popup-label">Contact:</span>
+                    <span class="popup-value">${device.contactPerson}</span>
+                </div>
+                ` : ''}
+                ${device.contactPhone ? `
+                <div class="popup-row">
+                    <span class="popup-label">Phone:</span>
+                    <span class="popup-value">${device.contactPhone}</span>
+                </div>
+                ` : ''}
+                ${device.notes ? `
+                <div class="popup-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                    <span style="color: #666; font-size: 12px;">${device.notes}</span>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // Function to load devices
+        async function loadDevices() {
+            try {
+                const parish = document.getElementById('parishFilter').value;
+                const type = document.getElementById('typeFilter').value;
+                const status = document.getElementById('statusFilter').value;
+
+                let url = '/api/StarlinkDevices?';
+                if (parish) url += `parish=${encodeURIComponent(parish)}&`;
+                if (type) url += `locationType=${type}&`;
+                if (status) url += `status=${status}&`;
+
+                const response = await fetch(url);
+                const devices = await response.json();
+
+                allDevices = devices;
+                updateMap(devices);
+                updateStats();
+            } catch (error) {
+                console.error('Error loading devices:', error);
+                alert('Error loading device data. Please refresh the page.');
+            }
+        }
+
+        // Function to update map markers
+        function updateMap(devices) {
+            markers.clearLayers();
+
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+
+            // Add markers
+            devices.forEach(device => {
+                const marker = L.marker([device.latitude, device.longitude], {
+                    icon: createMarkerIcon(device)
+                });
+
+                marker.bindPopup(createPopupContent(device));
+                markers.addLayer(marker);
+            });
+
+            map.addLayer(markers);
+
+            // Add heat map for active devices
+            const heatPoints = devices
+                .filter(d => d.status === 'Active')
+                .map(d => [d.latitude, d.longitude, 0.8]);
+
+            if (heatPoints.length > 0) {
+                heatLayer = L.heatLayer(heatPoints, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 10,
+                    gradient: {
+                        0.0: '#FFEDA0',
+                        0.4: '#FEB24C',
+                        0.6: '#FD8D3C',
+                        0.8: '#FC4E2A',
+                        1.0: '#E31A1C'
+                    }
+                }).addTo(map);
+            }
+
+            // Fit map to markers if we have any
+            if (devices.length > 0) {
+                const bounds = L.latLngBounds(devices.map(d => [d.latitude, d.longitude]));
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11 });
+            }
+        }
+
+        // Function to update statistics
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/Dashboard/stats');
+                const stats = await response.json();
+
+                document.getElementById('totalDevices').textContent = stats.totalDevices;
+                document.getElementById('activeDevices').textContent = stats.activeDevices;
+                document.getElementById('offlineDevices').textContent = stats.offlineDevices;
+                document.getElementById('maintenanceDevices').textContent = stats.maintenanceNeeded;
+                document.getElementById('policeStations').textContent = stats.policeStationCount;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Function to load parishes for filter
+        async function loadParishes() {
+            try {
+                const response = await fetch('/api/StarlinkDevices/parishes');
+                const parishes = await response.json();
+
+                const select = document.getElementById('parishFilter');
+                parishes.forEach(parish => {
+                    const option = document.createElement('option');
+                    option.value = parish;
+                    option.textContent = parish;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading parishes:', error);
+            }
+        }
+
+        // Export functions
+        function exportToExcel() {
+            const parish = document.getElementById('parishFilter').value;
+            const type = document.getElementById('typeFilter').value;
+
+            let url = '/api/StarlinkDevices/export/excel?';
+            if (parish) url += `parish=${encodeURIComponent(parish)}&`;
+            if (type) url += `locationType=${type}`;
+
+            window.open(url, '_blank');
+        }
+
+        function exportToGeoJson() {
+            const parish = document.getElementById('parishFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            let url = '/api/StarlinkDevices/export/geojson?';
+            if (parish) url += `parish=${encodeURIComponent(parish)}&`;
+            if (type) url += `locationType=${type}&`;
+            if (status) url += `status=${status}`;
+
+            window.open(url, '_blank');
+        }
+
+        // Add legend
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <h4><i class="fas fa-info-circle"></i> Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #28a745;"></div>
+                    <span>Active</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #ffc107;"></div>
+                    <span>Maintenance</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #dc3545;"></div>
+                    <span>Offline</span>
+                </div>
+                <div class="legend-item">
+                    <i class="fas fa-shield-alt" style="font-size: 20px; color: #dc3545; margin-right: 8px;"></i>
+                    <span>Police Station</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // Event listeners for filters
+        document.getElementById('parishFilter').addEventListener('change', loadDevices);
+        document.getElementById('typeFilter').addEventListener('change', loadDevices);
+        document.getElementById('statusFilter').addEventListener('change', loadDevices);
+
+        // Add double-click event to map for quick device addition
+        map.on('dblclick', function(e) {
+            const lat = e.latlng.lat.toFixed(6);
+            const lng = e.latlng.lng.toFixed(6);
+
+            // Open add device modal with coordinates pre-filled
+            openAddDeviceModal();
+            document.getElementById('add_latitude').value = lat;
+            document.getElementById('add_longitude').value = lng;
+
+            // Add a temporary marker to show where user clicked
+            const tempMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: '<i class="fas fa-map-pin" style="font-size: 30px; color: #ffc107;"></i>',
+                    iconSize: [30, 30],
+                    className: 'temp-marker'
+                })
+            }).addTo(map);
+
+            // Remove temporary marker when modal is closed
+            const originalClose = closeAddDeviceModal;
+            window.closeAddDeviceModal = function() {
+                map.removeLayer(tempMarker);
+                originalClose();
+                window.closeAddDeviceModal = originalClose;
+            };
+
+            // Show notification
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 5px; z-index: 10000; box-shadow: 0 4px 10px rgba(0,0,0,0.3); animation: slideInRight 0.3s;';
+            notification.innerHTML = '<i class="fas fa-check-circle"></i> Coordinates captured! Lat: ' + lat + ', Lng: ' + lng;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.3s';
+                setTimeout(() => notification.remove(), 300);
+            }, 2000);
+        });
+
+        // Initialize
+        loadParishes();
+        loadDevices();
+
+        // Auto-refresh every 60 seconds
+        setInterval(() => {
+            loadDevices();
+        }, 60000);
+
+        // Modal Functions
+        function openAddDeviceModal() {
+            populateParishDropdown('add_parish');
+            document.getElementById('add_installationDate').valueAsDate = new Date();
+            document.getElementById('addDeviceModal').style.display = 'block';
+        }
+
+        function closeAddDeviceModal() {
+            document.getElementById('addDeviceModal').style.display = 'none';
+            document.getElementById('addDeviceForm').reset();
+            hideAlert('addAlert');
+        }
+
+        function openEditDeviceModal(device) {
+            populateParishDropdown('edit_parish');
+
+            document.getElementById('edit_id').value = device.id;
+            document.getElementById('edit_deviceId').value = device.deviceId;
+            document.getElementById('edit_serialNumber').value = device.serialNumber || '';
+            document.getElementById('edit_installationDate').value = device.installationDate.split('T')[0];
+            document.getElementById('edit_locationName').value = device.locationName;
+            document.getElementById('edit_physicalAddress').value = device.physicalAddress;
+            document.getElementById('edit_parish').value = device.parish;
+            document.getElementById('edit_latitude').value = device.latitude;
+            document.getElementById('edit_longitude').value = device.longitude;
+            document.getElementById('edit_locationType').value = device.locationType;
+            document.getElementById('edit_status').value = device.status;
+            document.getElementById('edit_contactPerson').value = device.contactPerson || '';
+            document.getElementById('edit_contactPhone').value = device.contactPhone || '';
+            document.getElementById('edit_notes').value = device.notes || '';
+
+            document.getElementById('editDeviceModal').style.display = 'block';
+        }
+
+        function closeEditDeviceModal() {
+            document.getElementById('editDeviceModal').style.display = 'none';
+            document.getElementById('editDeviceForm').reset();
+            hideAlert('editAlert');
+        }
+
+        async function openManageDevicesModal() {
+            document.getElementById('manageDevicesModal').style.display = 'block';
+            await loadDeviceList();
+        }
+
+        function closeManageDevicesModal() {
+            document.getElementById('manageDevicesModal').style.display = 'none';
+            hideAlert('manageAlert');
+        }
+
+        function populateParishDropdown(elementId) {
+            const parishes = ["Kingston","St. Andrew","St. Thomas","Portland","St. Mary","St. Ann",
+                             "Trelawny","St. James","Hanover","Westmoreland","St. Elizabeth",
+                             "Manchester","Clarendon","St. Catherine"];
+            const select = document.getElementById(elementId);
+            select.innerHTML = '<option value="">-- Select Parish --</option>';
+            parishes.forEach(parish => {
+                const option = document.createElement('option');
+                option.value = parish;
+                option.textContent = parish;
+                select.appendChild(option);
+            });
+        }
+
+        function showAlert(elementId, message, isSuccess) {
+            const alert = document.getElementById(elementId);
+            alert.textContent = message;
+            alert.className = `alert ${isSuccess ? 'alert-success' : 'alert-error'}`;
+            alert.style.display = 'block';
+            setTimeout(() => hideAlert(elementId), 5000);
+        }
+
+        function hideAlert(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        async function submitAddDevice() {
+            // Validate required fields
+            const deviceId = document.getElementById('add_deviceId').value.trim();
+            const locationName = document.getElementById('add_locationName').value.trim();
+            const physicalAddress = document.getElementById('add_physicalAddress').value.trim();
+            const parish = document.getElementById('add_parish').value;
+            const latitude = document.getElementById('add_latitude').value;
+            const longitude = document.getElementById('add_longitude').value;
+
+            if (!deviceId) {
+                showAlert('addAlert', 'Device ID is required', false);
+                return;
+            }
+            if (!locationName) {
+                showAlert('addAlert', 'Location Name is required', false);
+                return;
+            }
+            if (!physicalAddress) {
+                showAlert('addAlert', 'Physical Address is required', false);
+                return;
+            }
+            if (!parish) {
+                showAlert('addAlert', 'Parish is required - please select a parish', false);
+                return;
+            }
+            if (!latitude || !longitude) {
+                showAlert('addAlert', 'Latitude and Longitude are required', false);
+                return;
+            }
+
+            const device = {
+                deviceId: deviceId,
+                serialNumber: document.getElementById('add_serialNumber').value || null,
+                installationDate: document.getElementById('add_installationDate').value,
+                locationName: locationName,
+                physicalAddress: physicalAddress,
+                parish: parish,
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                locationType: document.getElementById('add_locationType').value,
+                status: document.getElementById('add_status').value,
+                contactPerson: document.getElementById('add_contactPerson').value || null,
+                contactPhone: document.getElementById('add_contactPhone').value || null,
+                notes: document.getElementById('add_notes').value || null
+            };
+
+            try {
+                const response = await fetch('/api/StarlinkDevices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(device)
+                });
+
+                if (response.ok) {
+                    showAlert('addAlert', 'Device added successfully!', true);
+                    setTimeout(() => {
+                        closeAddDeviceModal();
+                        loadDevices();
+                    }, 1500);
+                } else {
+                    const errorText = await response.text();
+                    let errorMessage = 'Failed to add device';
+
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        if (errorJson.errors) {
+                            const errorMessages = Object.values(errorJson.errors).flat();
+                            errorMessage = errorMessages.join(', ');
+                        } else if (errorJson.title) {
+                            errorMessage = errorJson.title;
+                        }
+                    } catch (e) {
+                        errorMessage = errorText.substring(0, 100);
+                    }
+
+                    showAlert('addAlert', errorMessage, false);
+                }
+            } catch (error) {
+                showAlert('addAlert', `Error: ${error.message}`, false);
+            }
+        }
+
+        async function submitEditDevice() {
+            const id = parseInt(document.getElementById('edit_id').value);
+            const device = {
+                id: id,
+                deviceId: document.getElementById('edit_deviceId').value,
+                serialNumber: document.getElementById('edit_serialNumber').value,
+                installationDate: document.getElementById('edit_installationDate').value,
+                locationName: document.getElementById('edit_locationName').value,
+                physicalAddress: document.getElementById('edit_physicalAddress').value,
+                parish: document.getElementById('edit_parish').value,
+                latitude: parseFloat(document.getElementById('edit_latitude').value),
+                longitude: parseFloat(document.getElementById('edit_longitude').value),
+                locationType: document.getElementById('edit_locationType').value,
+                status: document.getElementById('edit_status').value,
+                contactPerson: document.getElementById('edit_contactPerson').value,
+                contactPhone: document.getElementById('edit_contactPhone').value,
+                notes: document.getElementById('edit_notes').value
+            };
+
+            try {
+                const response = await fetch(`/api/StarlinkDevices/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(device)
+                });
+
+                if (response.ok) {
+                    showAlert('editAlert', 'Device updated successfully!', true);
+                    setTimeout(() => {
+                        closeEditDeviceModal();
+                        loadDevices();
+                        if (document.getElementById('manageDevicesModal').style.display === 'block') {
+                            loadDeviceList();
+                        }
+                    }, 1500);
+                } else {
+                    const errorText = await response.text();
+                    let errorMessage = 'Failed to update device';
+
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        if (errorJson.errors) {
+                            const errorMessages = Object.values(errorJson.errors).flat();
+                            errorMessage = errorMessages.join(', ');
+                        } else if (errorJson.title) {
+                            errorMessage = errorJson.title;
+                        }
+                    } catch (e) {
+                        errorMessage = errorText.substring(0, 100);
+                    }
+
+                    showAlert('editAlert', errorMessage, false);
+                }
+            } catch (error) {
+                showAlert('editAlert', `Error: ${error.message}`, false);
+            }
+        }
+
+        async function deleteDevice(id, locationName) {
+            if (!confirm(`Are you sure you want to delete "${locationName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/StarlinkDevices/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showAlert('manageAlert', 'Device deleted successfully!', true);
+                    loadDeviceList();
+                    loadDevices();
+                } else {
+                    showAlert('manageAlert', 'Error deleting device', false);
+                }
+            } catch (error) {
+                showAlert('manageAlert', `Error: ${error.message}`, false);
+            }
+        }
+
+        async function loadDeviceList() {
+            try {
+                const response = await fetch('/api/StarlinkDevices');
+                const devices = await response.json();
+
+                const listHtml = devices.map(device => `
+                    <div class="device-item">
+                        <div class="device-info">
+                            <h4>${device.locationName}</h4>
+                            <p><strong>${device.deviceId}</strong> - ${device.parish} -
+                               <span class="status-badge ${device.status === 'Active' ? 'status-active' :
+                                                          device.status === 'Offline' ? 'status-offline' :
+                                                          'status-maintenance'}">
+                                   ${device.status.replace('MaintenanceNeeded', 'Maintenance')}
+                               </span>
+                            </p>
+                        </div>
+                        <div class="device-actions">
+                            <button class="btn btn-primary btn-small" onclick='openEditDeviceModal(${JSON.stringify(device).replace(/'/g, "\\'")})'>
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="btn btn-danger btn-small" onclick="deleteDevice(${device.id}, '${device.locationName.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('deviceList').innerHTML = listHtml || '<p style="text-align: center; color: #666;">No devices found</p>';
+            } catch (error) {
+                document.getElementById('deviceList').innerHTML = '<p style="text-align: center; color: #dc3545;">Error loading devices</p>';
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
